@@ -1,0 +1,7 @@
+imap-tools
+beautifulsoup4
+requests
+python-dotenv
+google-generativeai
+numpy
+sentence-transformers

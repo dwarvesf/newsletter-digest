@@ -1,0 +1,29 @@
+# File: config.yaml
+# Responsibility: Storing configuration settings in a human-readable format
+# This file contains:
+# - Email settings (e.g., allowed senders)
+# - Search settings (e.g., default number of days to search, minimum relevance score)
+# - Output settings (e.g., maximum number of results to return)
+
+email_settings:
+  allowed_senders:
+    - ngolap.nguyen@gmail.com
+    - jsw@peterc.org
+  allowed_domains:
+    - tldrnewsletter.com
+    - cooperpress.com
+    - ui.dev
+
+search_settings:
+  default_days: 30
+  min_relevance_score: 0.5
+  criteria:
+    - React
+    - NextJS
+    - Typescript
+    - TailwindCSS
+    - AI
+    - Tools
+
+output_settings:
+  max_results: 10
