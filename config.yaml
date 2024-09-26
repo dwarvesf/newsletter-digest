@@ -4,6 +4,7 @@
 # - Email settings (e.g., allowed senders)
 # - Search settings (e.g., default number of days to search, minimum relevance score)
 # - Output settings (e.g., maximum number of results to return)
+# - Cron job settings (e.g., frequency)
 
 email_settings:
   allowed_senders:
@@ -13,9 +14,9 @@ email_settings:
     - tldrnewsletter.com
     - cooperpress.com
     - ui.dev
+    - thisweekinreact.com
 
 search_settings:
-  default_days: 30
   min_relevance_score: 0.5
   criteria:
     - React
@@ -27,3 +28,6 @@ search_settings:
 
 output_settings:
   max_results: 10
+
+cron_settings:
+  frequency: 1440 # Frequency in minutes

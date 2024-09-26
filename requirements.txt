@@ -3,5 +3,6 @@ beautifulsoup4
 requests
 python-dotenv
 google-generativeai
-numpy
-sentence-transformers
+psycopg2-binary
+SQLAlchemy
+alembic

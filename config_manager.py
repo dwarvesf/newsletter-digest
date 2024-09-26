@@ -42,12 +42,7 @@ def get_allowed_senders():
     
     return valid_senders + [f"*@{domain}" for domain in valid_domains]
 
-def get_search_days():
-    # Retrieve the number of days to search for emails
-    config = load_config()
-    return config['search_settings']['default_days']
-
-def get_min_relevance_score():
+def get_min_relevancy_score():
     # Retrieve the minimum relevance score for articles
     config = load_config()
     return config['search_settings']['min_relevance_score']
@@ -61,3 +56,8 @@ def get_search_criteria():
     # Retrieve the list of search criteria from the config
     config = load_config()
     return config['search_settings']['criteria']
+
+def get_cron_frequency():
+    # Retrieve the frequency for the cron job in minutes
+    config = load_config()
+    return config['cron_settings']['frequency']

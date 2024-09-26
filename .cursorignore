@@ -1,5 +1,4 @@
 __pycache__
 .obsidian
-venv
+venv/*
 .env
-newsletter_bot.log
