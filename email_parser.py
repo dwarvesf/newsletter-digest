@@ -28,6 +28,13 @@ def extract_articles(email):
     3. Keep the rewritten content concise and engaging
     4. Restrict the description to be less than 160 characters, and be more to the point
     5. Generate an array of criteria that the article matches, along with a relevancy score (0-1) for each criterion
+      a. Ignore articles that read like
+        i. A GitHub release or update
+        ii. A sponsorship or donation request
+        iii. An advertisement
+      b. Prioritize articles that are news, research papers, or have a significant and unique contribution to the field
+      c. Save 0.9 and above for the most relevant articles, following the above guidelines
+      d. Use up to 2 decimal places for the relevancy scores
     6. Only include criteria with relevancy scores above {get_min_relevancy_score()}
 
     Email content:
