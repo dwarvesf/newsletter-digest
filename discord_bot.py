@@ -127,7 +127,7 @@ class ArticlePaginator(discord.ui.View):
 @bot.tree.command(name="fr", description="Fetch recent articles")
 @app_commands.describe(
     days="Number of days to fetch articles from (default: 7)",
-    all="Fetch all articles, including t`hose below the relevancy threshold (0 or 1, default: 0)",
+    all="Fetch all articles, including those below the relevancy threshold (0 or 1, default: 0)",
     criteria="Filter articles by criteria (default: None)"
 )
 @command_error_handler
@@ -149,6 +149,10 @@ async def fr(interaction: discord.Interaction, days: int = 7, all: int = 0, crit
         return
 
     articles = fetch_articles_from_days(days)
+
+    # Convert all articles to dictionaries
+    articles = [article.__dict__ for article in articles]
+
     min_relevancy = get_min_relevancy_score()
 
     if all == 0:
@@ -177,5 +181,112 @@ async def fr(interaction: discord.Interaction, days: int = 7, all: int = 0, crit
         await interaction.followup.send(embed=embed, view=paginator)
     else:
         await interaction.followup.send("No articles found for the specified period.")
+
+@bot.tree.command(name="memo-drafts", description="Generate memo drafts for recent articles")
+@app_commands.describe(
+    days="Number of days to fetch articles from (default: 7)",
+    criteria="Generate memo for a specific criteria (default: None)"
+)
+@command_error_handler
+async def memo_drafts(interaction: discord.Interaction, days: int = 7, criteria: str = None):
+    await interaction.response.defer()
+
+    if days < 1:
+        await interaction.followup.send("Please provide a valid number of days (greater than 0).")
+        return
+
+    valid_criteria = get_search_criteria()
+    if criteria and criteria not in valid_criteria:
+        criteria_list = ", ".join(valid_criteria)
+        await interaction.followup.send(f"Invalid criteria. Please choose from: {criteria_list}")
+        return
+
+    articles = fetch_articles_from_days(days)
+
+    # Convert all articles to dictionaries
+    articles = [article.__dict__ for article in articles]
+
+    min_relevancy = get_min_relevancy_score()
+
+    # Filter articles by minimum relevancy score
+    articles = [
+        a for a in articles 
+        if any(criterion['score'] >= min_relevancy for criterion in a['criteria'])
+    ]
+
+    if not articles:
+        await interaction.followup.send("No relevant articles found for the specified period.")
+        return
+
+    # Generate memo drafts
+    used_articles = set()
+    if criteria:
+        memo_draft, used_articles = generate_memo_draft(articles, criteria, used_articles=used_articles)
+        memo_drafts = [memo_draft]
+    else:
+        top_criteria = valid_criteria[:3]
+        memo_drafts = []
+        for c in top_criteria:
+            memo_draft, used_articles = generate_memo_draft(articles, c, used_articles=used_articles)
+            memo_drafts.append(memo_draft)
+        other_memo_draft, used_articles = generate_memo_draft(articles, "Other", valid_criteria[3:], used_articles=used_articles)
+        memo_drafts.append(other_memo_draft)
+
+    # Create and send embeds
+    embeds = [create_memo_embed(memo) for memo in memo_drafts if memo['articles']]
+    
+    if embeds:
+        await interaction.followup.send(embeds=embeds[:10])  # Discord allows max 10 embeds per message
+    else:
+        await interaction.followup.send("No memo drafts could be generated for the specified criteria and period.")
+
+def generate_memo_draft(articles, criteria, other_criteria=None, used_articles=None):
+    if used_articles is None:
+        used_articles = set()
+
+    if other_criteria:
+        filtered_articles = [
+            a for a in articles 
+            if any(criterion['name'] in other_criteria for criterion in a['criteria'])
+            and a['url'] not in used_articles
+        ]
+    else:
+        filtered_articles = [
+            a for a in articles 
+            if any(criterion['name'] == criteria for criterion in a['criteria'])
+            and a['url'] not in used_articles
+        ]
+    
+    # Sort articles by relevancy score for the specific criteria
+    filtered_articles.sort(
+        key=lambda x: next((criterion['score'] for criterion in x['criteria'] if criterion['name'] == criteria), 0),
+        reverse=True
+    )
+
+    selected_articles = filtered_articles[:8]  # Top 8 articles
+    used_articles.update(article['url'] for article in selected_articles)
+
+    memo = {
+        'criteria': criteria,
+        'articles': selected_articles
+    }
+
+    return memo, used_articles
+
+def create_memo_embed(memo):
+    embed = discord.Embed(title=f"Memo Draft: {memo['criteria']}", color=0xFFFF00)
+    
+    for i, article in enumerate(memo['articles'][:3], start=1):
+        embed.add_field(
+            name=article['title'],
+            value=f"{article['description']}\n[Read more]({article['url']})",
+            inline=False
+        )
+    
+    quick_links = "\n".join([f"- [{a['title']}]({a['url']})" for a in memo['articles'][3:8]])
+    if quick_links:
+        embed.add_field(name="Quick links", value=quick_links, inline=False)
+    
+    return embed
 
 bot.run(TOKEN)

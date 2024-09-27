@@ -52,7 +52,7 @@ def save_article(db, email_uid, email_time, title, description, url, criteria):
         return db.query(Article).filter(Article.url == url).first()
 
 def get_articles(db, date_from=None, limit=None):
-    query = db.query(Article)
+    query = db.query(Article).filter(Article.url.notlike('%https://github.com%'))
     if date_from:
         query = query.filter(Article.email_time >= date_from)
     query = query.order_by(Article.email_time.desc())

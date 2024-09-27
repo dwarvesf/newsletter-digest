@@ -21,9 +21,9 @@ search_settings:
   criteria:
     - React
     - NextJS
+    - AI
     - Typescript
     - TailwindCSS
-    - AI
     - Tools
 
 output_settings:
