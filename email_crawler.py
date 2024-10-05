@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from database import get_db, save_article, get_articles
 from sqlalchemy.orm import Session
 import ast
+from typing import List, Optional
 
 # Set up logging
 logging.basicConfig(
@@ -92,9 +93,10 @@ def process_and_save_email(email):
     
     logger.info(f"Processed and saved email: {email.subject}")
 
-def fetch_articles_from_days(days):
+def fetch_articles_from_days(days: int, criteria: Optional[str] = None) -> List[dict]:
     """
     Fetch articles from the last 'days' days from the PostgreSQL database.
+    Optionally filter by criteria.
     Returns a list of articles with properly parsed criteria.
     """
     cutoff_date = datetime.now() - timedelta(days=days)
@@ -110,6 +112,16 @@ def fetch_articles_from_days(days):
                 article.criteria = ast.literal_eval(article.criteria)
             except (ValueError, SyntaxError):
                 article.criteria = []  # Set to empty list if parsing fails
+
+    # Filter by criteria if provided
+    if criteria:
+        criteria_list = [c.strip().lower() for c in criteria.split(',')]
+        filtered_articles = []
+        for article in articles:
+            article_criteria = [c['name'].lower() for c in article.criteria]
+            if any(c in article_criteria for c in criteria_list):
+                filtered_articles.append(article)
+        articles = filtered_articles
 
     return articles
 

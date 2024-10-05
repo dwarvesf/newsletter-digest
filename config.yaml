@@ -10,6 +10,7 @@ email_settings:
   allowed_senders:
     - ngolap.nguyen@gmail.com
     - jsw@peterc.org
+    - pragmaticengineer@substack.com
   allowed_domains:
     - tldrnewsletter.com
     - cooperpress.com
@@ -22,8 +23,8 @@ search_settings:
     - React
     - NextJS
     - AI
-    - Typescript
-    - TailwindCSS
+    - Typescript, Javascript
+    - TailwindCSS, CSS
     - Tools
 
 output_settings:
