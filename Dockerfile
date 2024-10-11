@@ -13,5 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Make port 80 available to the world outside this container
 EXPOSE 80
 
+# Make port 5000 available for the health check
+EXPOSE 5000
+
 # Run discord_bot.py when the container launches
 CMD ["python", "discord_bot.py"]

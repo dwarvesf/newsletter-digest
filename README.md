@@ -6,6 +6,7 @@ This project contains a bot that processes and digests newsletter content, focus
 
 - Python 3.x
 - pip (Python package installer)
+- Docker (optional, for containerized deployment)
 
 ## Setup
 
@@ -47,11 +48,38 @@ Ensure these are correctly set up for your use case.
 
 ## Running the Bot
 
-To run the newsletter digest bot, use the following command:
+### Local Execution
+
+To run the newsletter digest bot locally, use the following command:
 
 ```
 python discord_bot.py
 ```
+
+### Docker Execution
+
+To run the bot using Docker:
+
+1. Build the Docker image:
+
+   ```
+   docker build -t newsletter-digest-bot .
+   ```
+
+2. Run the Docker container:
+   ```
+   docker run -p 5000:5000 -p 80:80 newsletter-digest-bot
+   ```
+
+## Health Check
+
+The application includes a health check endpoint at `/healthz`. You can access it at:
+
+```
+http://localhost:5000/healthz
+```
+
+This endpoint returns a JSON response `{"message": "ok"}` with a status code of 200 when the application is running correctly.
 
 ## Project Structure
 
@@ -65,6 +93,7 @@ python discord_bot.py
 - Email parsing and content extraction
 - Integration with Google's Gemini AI for content summarization
 - Discord bot for displaying paginated article results
+- Health check endpoint for monitoring application status
 
 ## Database Setup
 
@@ -93,5 +122,7 @@ If you encounter any issues:
 1. Ensure all dependencies are correctly installed.
 2. Verify that the `.env` and `config.yaml` files are properly configured.
 3. Check the `newsletter_bot.log` file for any error messages or warnings.
+4. If using Docker, ensure the container is running and ports are correctly mapped.
+5. Use the health check endpoint to verify the application's status.
 
 For further assistance, please contact the project maintainer.

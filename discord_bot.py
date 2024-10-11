@@ -11,6 +11,8 @@ from discord import app_commands
 import sys
 import signal
 import asyncio
+from flask import Flask, jsonify
+import threading
 
 # Set up logging
 logging.basicConfig(
@@ -32,6 +34,20 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 intents = Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='?', intents=intents)
+
+# Set up Flask app
+app = Flask(__name__)
+
+@app.route('/healthz')
+def health_check():
+    return jsonify({"message": "ok"}), 200
+
+def run_flask():
+    app.run(host='0.0.0.0', port=5000)
+
+# Start Flask in a separate thread
+flask_thread = threading.Thread(target=run_flask)
+flask_thread.start()
 
 def command_error_handler(func):
     @functools.wraps(func)

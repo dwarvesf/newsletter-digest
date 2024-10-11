@@ -6,4 +6,4 @@ google-generativeai
 psycopg2-binary
 SQLAlchemy
 alembic
-watchdog
+Flask
