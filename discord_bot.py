@@ -1,6 +1,6 @@
 import os
 from discord.ext import commands, tasks
-from email_crawler import fetch_unread_emails, fetch_articles_from_days
+from email_crawler import fetch_articles_from_days
 from discord import Intents
 from dotenv import load_dotenv
 from config_manager import get_cron_frequency, get_min_relevancy_score, get_search_criteria
@@ -66,13 +66,6 @@ for command in bot.commands:
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
-    if not fetch_unread_emails_task.is_running():
-        fetch_unread_emails_task.start()  # Start the cron job
-
-@tasks.loop(minutes=get_cron_frequency())  # Use cron frequency from config
-async def fetch_unread_emails_task():
-    print("Fetching unread emails")
-    fetch_unread_emails()
 
 class NewsletterBot(commands.Bot):
     def __init__(self):
@@ -326,11 +319,15 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-try:
-    bot.run(TOKEN)
-except Exception as e:
-    print(f"Unhandled exception: {e}")
-    sys.exit(1)
-finally:
-    if not bot.is_closed():
-        bot.loop.run_until_complete(bot.close())
+def run_bot():
+    try:
+        bot.run(TOKEN)
+    except Exception as e:
+        print(f"Unhandled exception: {e}")
+        sys.exit(1)
+    finally:
+        if not bot.is_closed():
+            bot.loop.run_until_complete(bot.close())
+
+if __name__ == "__main__":
+    run_bot()
