@@ -181,7 +181,8 @@ async def fr(interaction: discord.Interaction, days: int = 7, all: int = 0, crit
         if criteria:
             articles.sort(key=lambda x: next((criterion['score'] for criterion in x.criteria if criterion['name'].lower() == criteria), 0), reverse=True)
         else:
-            articles.sort(key=lambda x: x.criteria[0]['score'], reverse=True)
+            # Safely get the highest score from criteria, defaulting to 0 if criteria is empty
+            articles.sort(key=lambda x: x.criteria[0]['score'] if x.criteria else 0, reverse=True)
 
         paginator = ArticlePaginator(articles, days)
         embed = paginator.create_embed()
