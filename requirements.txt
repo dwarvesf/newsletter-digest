@@ -9,3 +9,8 @@ alembic
 Flask
 discord.py
 pyyaml
+requests
+beautifulsoup4
+transformers
+torch 
+torchvision
