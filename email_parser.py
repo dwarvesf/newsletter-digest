@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Configure the Gemini API
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-model = genai.GenerativeModel('gemini-1.5-pro')
+model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
 def extract_articles(email):
     """
