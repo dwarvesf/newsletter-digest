@@ -2,7 +2,7 @@ def get_extract_articles_prompt(content=None, grouped_criteria=None, min_relevan
     return f"""
     Analyze the following email content and extract information about articles mentioned.
     For each article:
-    1. Extract the original title, description (if available), and URL (look for [LINK: url] in the text)
+    1. Extract the original title, description (if available), and URL (look for [LINK: url] in the text or <title>,<link>,<description> in content)
     2. Rewrite the title and description in a friendlier, lighter tone with a touch of personal feel
     3. Keep the rewritten content concise and engaging
     4. Restrict the description to be less than 160 characters, and be more to the point

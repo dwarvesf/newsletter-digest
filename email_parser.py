@@ -3,32 +3,44 @@ import google.generativeai as genai
 import os
 import json
 import re
-from config_manager import get_search_criteria, get_min_relevancy_score
+import time
+from config_manager import get_search_criteria, get_min_relevancy_score, get_gemini_rate_limit
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from article_summarize import crawl_and_summarize
 from promts import get_extract_articles_prompt
+
 logger = logging.getLogger(__name__)
 
 # Configure the Gemini API
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
+# Rate limiter variables
+last_api_call_time = 0
+rate_limit_interval = 60 / get_gemini_rate_limit()
+
 def extract_articles(email):
-    """
-    Extracts individual articles from an email using Gemini 1.5 Pro.
-    Returns a list of dictionaries, each containing article title, description, and URL.
-    """
+    global last_api_call_time
+    articles = []
+
     logger.info(f"Extracting articles from email: {email.subject}")
     
     # Get grouped criteria
     grouped_criteria = get_search_criteria()
     
-   
+    # Ensure rate limit is respected
+    current_time = time.time()
+    time_since_last_call = current_time - last_api_call_time
+    if time_since_last_call < rate_limit_interval:
+        sleep_time = rate_limit_interval - time_since_last_call
+        logger.info(f"Rate limit exceeded, sleeping for {sleep_time:.2f} seconds")
+        time.sleep(sleep_time)
     
     logger.info("Requesting Gemini to extract articles from email")
     prompt = get_extract_articles_prompt(email.text or email.html, grouped_criteria, get_min_relevancy_score(),True)
     response = model.generate_content(prompt)
+    last_api_call_time = time.time()  # Update the last API call time
     
     try:
         json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
@@ -50,6 +62,7 @@ def extract_articles(email):
         logger.info("Requesting Gemini to extract other articles from email")
 
         enrichment_response = model.generate_content(enrichment_prompt)
+        last_api_call_time = time.time()  # Update the last API call time
 
         try:
             enrichment_json_match = re.search(r'\[.*\]', enrichment_response.text, re.DOTALL)
@@ -63,7 +76,10 @@ def extract_articles(email):
         except Exception as e:
             logger.error(f"Error parsing Gemini response: {str(e)}")
 
-        articles = [article for article in articles if not article.get('need_enrichment', True)]
+        articles = [
+            article for article in articles
+            if not article.get('need_enrichment', False) and isinstance(article.get('criteria'), list)
+        ]
     except json.JSONDecodeError as e:
         logger.error(f"Error decoding JSON from Gemini response: {str(e)}")
         articles = []
