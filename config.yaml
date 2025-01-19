@@ -32,3 +32,6 @@ output_settings:
 
 cron_settings:
   frequency: 1440 # Frequency in minutes
+# config.yaml
+api_settings:
+  gemini_rate_limit: 10 # Maximum number of calls per minute

@@ -61,3 +61,8 @@ def get_cron_frequency():
     # Retrieve the frequency for the cron job in minutes
     config = load_config()
     return config['cron_settings']['frequency']
+
+def get_gemini_rate_limit():
+    # Retrieve the Gemini API rate limit from the config
+    config = load_config()
+    return config['api_settings']['gemini_rate_limit']

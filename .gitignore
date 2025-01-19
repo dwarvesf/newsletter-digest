@@ -3,3 +3,4 @@ __pycache__
 venv
 .env
 newsletter_bot.log
+.DS_Store
