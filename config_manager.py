@@ -66,3 +66,8 @@ def get_gemini_rate_limit():
     # Retrieve the Gemini API rate limit from the config
     config = load_config()
     return config['api_settings']['gemini_rate_limit']
+
+def get_gemini_model_name():
+    # Retrieve the Gemini model name from the config
+    config = load_config()
+    return config['api_settings']['gemini_model_name']
