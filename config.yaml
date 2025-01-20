@@ -35,3 +35,4 @@ cron_settings:
 # config.yaml
 api_settings:
   gemini_rate_limit: 10 # Maximum number of calls per minute
+  gemini_model_name: "gemini-1.5-pro" # Model name

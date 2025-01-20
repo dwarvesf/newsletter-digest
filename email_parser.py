@@ -4,7 +4,7 @@ import os
 import json
 import re
 import time
-from config_manager import get_search_criteria, get_min_relevancy_score, get_gemini_rate_limit
+from config_manager import get_search_criteria, get_min_relevancy_score, get_gemini_rate_limit, get_gemini_model_name
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from article_summarize import crawl_and_summarize
@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 # Configure the Gemini API
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-model = genai.GenerativeModel('gemini-2.0-flash-exp')
+model_name = get_gemini_model_name()
+model = genai.GenerativeModel(model_name)
 
 # Rate limiter variables
 last_api_call_time = 0
