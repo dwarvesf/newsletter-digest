@@ -1,16 +1,17 @@
-imap-tools
-beautifulsoup4
-requests
-python-dotenv
+imap-tools            # Used in email_crawler.py for email fetching
+beautifulsoup4        # Used in email_parser.py for web scraping
+requests              # Used in email_parser.py for HTTP requests
+python-dotenv         # Used across files for .env loading
 google-generativeai
 psycopg2-binary
 SQLAlchemy
 alembic
 Flask
-discord.py
-pyyaml
-requests
-beautifulsoup4
-transformers
-torch 
-torchvision
+pyyaml               # Used in config_manager.py for YAML config
+
+google-cloud-storage # Used in storage.py for GCS operations
+hvac                 # Used in storage.py for Vault operations
+openai               # Used in email_parser.py for OpenAI API
+
+pandas               # Used for DataFrame operations
+pyarrow             # Used for Parquet file operations

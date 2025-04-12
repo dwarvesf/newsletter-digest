@@ -62,12 +62,12 @@ def get_cron_frequency():
     config = load_config()
     return config['cron_settings']['frequency']
 
-def get_gemini_rate_limit():
-    # Retrieve the Gemini API rate limit from the config
+def get_openai_rate_limit():
+    # Retrieve the OpenAI API rate limit from the config
     config = load_config()
-    return config['api_settings']['gemini_rate_limit']
+    return config['api_settings']['openai_rate_limit']
 
-def get_gemini_model_name():
-    # Retrieve the Gemini model name from the config
+def get_openai_model_name():
+    # Retrieve the OpenAI model name from the config
     config = load_config()
-    return config['api_settings']['gemini_model_name']
+    return config['api_settings']['openai_model_name']

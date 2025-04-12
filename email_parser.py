@@ -1,25 +1,84 @@
 import logging
-import google.generativeai as genai
 import os
 import json
 import re
 import time
-from config_manager import get_search_criteria, get_min_relevancy_score, get_gemini_rate_limit, get_gemini_model_name
+import requests
+from bs4 import BeautifulSoup
+from openai import OpenAI
+from config_manager import get_search_criteria, get_min_relevancy_score, get_openai_model_name, get_openai_rate_limit
 from datetime import datetime
 from email.utils import parsedate_to_datetime
-from article_summarize import crawl_and_summarize
 from promts import get_extract_articles_prompt
 
 logger = logging.getLogger(__name__)
 
-# Configure the Gemini API
-genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-model_name = get_gemini_model_name()
-model = genai.GenerativeModel(model_name)
+# Configure OpenAI client
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+model_name = get_openai_model_name()
 
 # Rate limiter variables
 last_api_call_time = 0
-rate_limit_interval = 60 / get_gemini_rate_limit()
+rate_limit_interval = 60 / get_openai_rate_limit()
+
+def get_seo_description(url: str) -> str:
+    """Fetch SEO description from article URL using multiple meta tag formats"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Extended list of meta tag formats
+        meta_tag_attrs = [
+            {'name': 'description'},
+            {'property': 'og:description'},
+            {'name': 'twitter:description'},
+            {'name': 'dc.description'},      # Dublin Core
+            {'name': 'Description'},          # Capitalized variant
+            {'property': 'description'},      # Alternative property
+            {'itemprop': 'description'},      # Schema.org
+            {'name': 'dcterms.description'},  # Dublin Core Terms
+            {'name': 'abstract'}             # Academic content
+        ]
+        
+        # Try all meta tag formats
+        for attrs in meta_tag_attrs:
+            tag = soup.find('meta', attrs=attrs)
+            if tag and tag.get('content'):
+                return tag['content'].strip()
+        
+        # Fallback to first paragraph if no meta description
+        first_p = soup.find('p')
+        if first_p:
+            return first_p.get_text().strip()[:200] + '...'
+        
+        return ""
+    except Exception as e:
+        logger.error(f"Error fetching SEO description for {url}: {str(e)}")
+        return ""
+
+def get_article_content(url: str) -> dict:
+    """Fetch article content using Jina AI REST API"""
+    try:
+        jina_url = f"https://r.jina.ai/{url}"
+        headers = {
+            'Authorization': f'Bearer {os.getenv("JINA_API_KEY")}',
+        }
+        
+        response = requests.get(jina_url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        content = response.text
+        return content
+       
+            
+    except Exception as e:
+        logger.error(f"Error fetching article content from Jina AI: {str(e)}")
+        return {}
 
 def extract_articles(email):
     global last_api_call_time
@@ -38,57 +97,56 @@ def extract_articles(email):
         logger.info(f"Rate limit exceeded, sleeping for {sleep_time:.2f} seconds")
         time.sleep(sleep_time)
     
-    logger.info("Requesting Gemini to extract articles from email")
-    prompt = get_extract_articles_prompt(email.text or email.html, grouped_criteria, get_min_relevancy_score(),True)
-    response = model.generate_content(prompt)
-    last_api_call_time = time.time()  # Update the last API call time
+    logger.info("Requesting OpenAI to extract articles from email")
+    prompt = get_extract_articles_prompt(email.text or email.html, grouped_criteria, get_min_relevancy_score())
     
     try:
-        json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(0)
-            articles = json.loads(json_str)
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that extracts articles from newsletter emails and returns them in JSON format."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        last_api_call_time = time.time()
+
+        # Parse the response content
+        response_content = response.choices[0].message.content
+        parsed_response = json.loads(response_content)
+        
+        # Expect articles to be in a key called 'articles'
+        if 'articles' in parsed_response:
+            articles = parsed_response['articles']
         else:
-            raise ValueError("No JSON array found in the response")
-        need_enrichment_articles = [article for article in articles if article.get('need_enrichment', True)]
+            raise ValueError("Response missing 'articles' key")
 
-        if len(need_enrichment_articles) > 0:
-            logger.info(f"Starting to crawl {len(need_enrichment_articles)} other articles")
-            for article in need_enrichment_articles:
-                summary = crawl_and_summarize(article.get('url'))
-                article['summary'] = summary
+        # Filter articles and fetch descriptions if missing
+        processed_articles = []
+        for article in articles:
+            if isinstance(article.get('criteria'), list):
+                logger.info(f"Fetching content for {article['url']}")
+                content = get_article_content(article['url'])
+                if content:
+                     article['raw_content']=content
+                # Fallback to SEO description if Jina fails
+                if not article['description']:
+                    logger.info(f"Falling back to SEO description for {article['url']}")
+                    article['description'] = get_seo_description(article['url'])
+                
+                processed_articles.append(article)
+        
+        articles = processed_articles
 
-        need_enrichment_article_prompt_content = "__".join([f"{article.get('title')},{article.get('url')},{article.get('summary')}." for article in need_enrichment_articles])
-        enrichment_prompt = get_extract_articles_prompt(need_enrichment_article_prompt_content, grouped_criteria, get_min_relevancy_score())
-        logger.info("Requesting Gemini to extract other articles from email")
-
-        enrichment_response = model.generate_content(enrichment_prompt)
-        last_api_call_time = time.time()  # Update the last API call time
-
-        try:
-            enrichment_json_match = re.search(r'\[.*\]', enrichment_response.text, re.DOTALL)
-            if enrichment_json_match:
-                enrichment_json_str = enrichment_json_match.group(0)
-
-                enrichment_articles = json.loads(enrichment_json_str)
-                articles.extend(enrichment_articles)
-            else:
-                raise ValueError("No JSON array found in the response")
-        except Exception as e:
-            logger.error(f"Error parsing Gemini response: {str(e)}")
-
-        articles = [
-            article for article in articles
-            if not article.get('need_enrichment', False) and isinstance(article.get('criteria'), list)
-        ]
     except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON from Gemini response: {str(e)}")
+        logger.error(f"Error decoding JSON from OpenAI response: {str(e)}")
         articles = []
     except ValueError as e:
-        logger.error(f"Error in Gemini response structure: {str(e)}")
+        logger.error(f"Error in OpenAI response structure: {str(e)}")
         articles = []
     except Exception as e:
-        logger.error(f"Unexpected error parsing Gemini response: {str(e)}")
+        logger.error(f"Unexpected error parsing OpenAI response: {str(e)}")
         articles = []
     
     logger.info(f"Extracted {len(articles)} articles from the email")

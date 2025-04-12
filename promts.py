@@ -1,4 +1,4 @@
-def get_extract_articles_prompt(content=None, grouped_criteria=None, min_relevancy_score=None,is_all=False):
+def get_extract_articles_prompt(content=None, grouped_criteria=None, min_relevancy_score=None):
     return f"""
     Analyze the following email content and extract information about articles mentioned.
     For each article:
@@ -15,12 +15,11 @@ def get_extract_articles_prompt(content=None, grouped_criteria=None, min_relevan
       c. Save 0.9 and above for the most relevant articles, following the above guidelines
       d. Use up to 2 decimal places for the relevancy scores
     6. Only include criteria with relevancy scores above {min_relevancy_score}
-    {is_all and "7. If the article does not meet any of the criteria or lacks a description, return it with 'need_enrichment' set to True" or ""}
     
     Email content:
     {content}
 
-    Format the output as a JSON array of objects, each with 'title', 'description', 'url', 'need_enrichment', and 'criteria' keys.
+    Format the output as a JSON array of objects, each with 'title', 'description', 'url', and 'criteria' keys.
     The 'title' and 'description' should contain the rewritten versions.
     The 'criteria' should be an array of objects, each with 'name' and 'score' keys.
     Ensure that the output is valid JSON. If no URL is found for an article, use an empty string for the 'url' value.
