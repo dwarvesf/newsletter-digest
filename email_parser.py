@@ -10,6 +10,9 @@ from config_manager import get_search_criteria, get_min_relevancy_score, get_ope
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from promts import get_extract_articles_prompt
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +24,26 @@ model_name = get_openai_model_name()
 last_api_call_time = 0
 rate_limit_interval = 60 / get_openai_rate_limit()
 
+def create_session_with_retries(retries: int = 3, backoff_factor: float = 0.5) -> requests.Session:
+    """Create a session with retry strategy"""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=[429, 500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
 def get_seo_description(url: str) -> str:
     """Fetch SEO description from article URL using multiple meta tag formats"""
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -61,24 +77,57 @@ def get_seo_description(url: str) -> str:
         logger.error(f"Error fetching SEO description for {url}: {str(e)}")
         return ""
 
-def get_article_content(url: str) -> dict:
-    """Fetch article content using Jina AI REST API"""
+def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
+    """
+    Fetch article content using Jina AI REST API and parse the response
+    
+    Args:
+        url (str): The URL to fetch content from
+        timeout (int): Request timeout in seconds
+        retries (int): Number of retries for failed requests
+        
+    Returns:
+        str: Article content text after 'Markdown Content:' line
+    """
     try:
         jina_url = f"https://r.jina.ai/{url}"
         headers = {
             'Authorization': f'Bearer {os.getenv("JINA_API_KEY")}',
         }
         
-        response = requests.get(jina_url, headers=headers, timeout=15)
-        response.raise_for_status()
+        session = create_session_with_retries(retries=retries)
         
-        content = response.text
-        return content
-       
+        response = session.get(
+            jina_url, 
+            headers=headers, 
+            timeout=(timeout, timeout)
+        )
+        response.raise_for_status()
+
+        content_lines = []
+        found_markdown = False
+        
+        for line in response.text.split('\n'):
+            if line.startswith('Markdown Content:'):
+                found_markdown = True
+                continue
+            if found_markdown and line.strip():
+                content_lines.append(line.strip())
+        
+        return '\n'.join(content_lines) if content_lines else ""
             
+    except requests.Timeout as e:
+        logger.error(f"Timeout fetching content from Jina AI for {url}: {str(e)}")
+        return ""
+    except requests.ConnectionError as e:
+        logger.error(f"Connection error with Jina AI for {url}: {str(e)}")
+        return ""
+    except requests.RequestException as e:
+        logger.error(f"Request failed for Jina AI for {url}: {str(e)}")
+        return ""
     except Exception as e:
-        logger.error(f"Error fetching article content from Jina AI: {str(e)}")
-        return {}
+        logger.error(f"Unexpected error fetching content from Jina AI for {url}: {str(e)}")
+        return ""
 
 def extract_articles(email):
     global last_api_call_time
