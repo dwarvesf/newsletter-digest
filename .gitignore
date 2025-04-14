@@ -5,3 +5,6 @@ venv
 newsletter_bot.log
 .DS_Store
 output
+
+# Batch processing files
+batch_input_*.jsonl

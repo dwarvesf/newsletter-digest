@@ -117,7 +117,6 @@ def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
         
         raw_content = '\n'.join(content_lines) if content_lines else ""
         
-        # Only sanitize if we have content
         if raw_content:
             logger.info(f"Sanitizing content from {url}")
             return raw_content
@@ -137,11 +136,24 @@ def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
         logger.error(f"Unexpected error fetching content from Jina AI for {url}: {str(e)}")
         return ""
 
+def get_sender_domain(email_address: str) -> str:
+    """Extract domain part from email address"""
+    try:
+        return email_address.split('@')[1].strip() if '@' in email_address else ''
+    except Exception as e:
+        logger.error(f"Error extracting sender domain: {str(e)}")
+        return ''
+
 def extract_articles(email):
+    """Process email and extract articles with sender information"""
     global last_api_call_time
     articles = []
 
     logger.info(f"Extracting articles from email: {email.subject}")
+    
+    # Extract sender domain
+    sender_domain = get_sender_domain(email.from_)
+    logger.info(f"Processing email from domain: {sender_domain}")
     
     # Get grouped criteria
     grouped_criteria = get_search_criteria()
@@ -153,10 +165,9 @@ def extract_articles(email):
         sleep_time = rate_limit_interval - time_since_last_call
         logger.info(f"Rate limit exceeded, sleeping for {sleep_time:.2f} seconds")
         time.sleep(sleep_time)
-    
     logger.info("Requesting OpenAI to extract articles from email")
     prompt = get_extract_articles_prompt(email.text or email.html, grouped_criteria, get_min_relevancy_score())
-    
+
     try:
         response = client.chat.completions.create(
             model=model_name,
@@ -186,7 +197,9 @@ def extract_articles(email):
                 logger.info(f"Fetching content for {article['url']}")
                 content = get_article_content(article['url'])
                 if content:
-                     article['raw_content']=content
+                    article['raw_content'] = content
+                    article['source_domain'] = sender_domain  # Add sender domain
+                
                 # Fallback to SEO description if Jina fails
                 if not article['description']:
                     logger.info(f"Falling back to SEO description for {article['url']}")
@@ -206,7 +219,7 @@ def extract_articles(email):
         logger.error(f"Unexpected error parsing OpenAI response: {str(e)}")
         articles = []
     
-    logger.info(f"Extracted {len(articles)} articles from the email")
+    logger.info(f"Extracted {len(articles)} articles from {sender_domain}")
     return articles
 
 def parse_date(date_str):

@@ -15,6 +15,7 @@ from storage import StorageUtil
 import ast
 from typing import List, Optional
 import pandas as pd
+from content_sanitizer import BatchContentSanitizer
 
 # Set up logging
 logging.basicConfig(
@@ -51,7 +52,7 @@ def fetch_unread_emails():
             
             logger.info("Applying filters and fetching emails")
             
-            emails = list(mailbox.fetch(AND(sender_filter, unread_filter)))
+            emails = list(mailbox.fetch(AND(sender_filter, unread_filter),limit=1))
             logger.info(f"Fetched {len(emails)} unread emails")
 
             # Sort emails by date (older to newer)
@@ -113,6 +114,7 @@ def process_and_save_email(email):
             'url': url,
             'criteria': str(article['criteria']),
             'created_at': datetime.now(),
+            'source_domain': article.get('source_domain', ''),
             'raw_content': article.get('raw_content', ''),
         }
         new_articles.append(new_article)
@@ -132,7 +134,7 @@ def process_and_save_email(email):
     logger.info(f"Initial save: {len(new_articles)} articles from email {email.subject}")
 
     # Sanitize content using OpenAI batch processing
-    sanitizer = ContentSanitizer()
+    sanitizer = BatchContentSanitizer()
     raw_contents = [article['raw_content'] for article in new_articles]
     sanitized_contents = sanitizer.sanitize_contents(raw_contents)
 
