@@ -76,6 +76,7 @@ def fetch_unread_emails():
 def process_and_save_email(email):
     """
     Processes a single email, extracts articles, and saves them to Parquet format.
+    Ensures articles are unique by URL.
     """
     # Extract articles from email
     articles = extract_articles(email)
@@ -91,31 +92,59 @@ def process_and_save_email(email):
     except:
         existing_df = pd.DataFrame()
 
-    # Prepare new articles
+    # Prepare new articles, ensuring URL uniqueness
     new_articles = []
+    seen_urls = set()  # Track URLs we've already processed
+
     for article in articles:
+        url = article['url'].split('?')[0]  # Clean URL
+        
+        # Skip if we've already seen this URL
+        if url in seen_urls:
+            logger.info(f"Skipping duplicate URL: {url}")
+            continue
+            
+        seen_urls.add(url)
         new_article = {
             'email_uid': email.uid,
             'email_time': parse_date(email.date_str),
             'title': article['title'],
             'description': article['description'],
-            'url': article['url'].split('?')[0],
-            'criteria': str(article['criteria']),  # Convert list to string for Parquet
+            'url': url,
+            'criteria': str(article['criteria']),
             'created_at': datetime.now(),
             'raw_content': article.get('raw_content', ''),
         }
         new_articles.append(new_article)
 
-    # Convert to DataFrame and combine with existing
+    # Convert to DataFrame and handle duplicates with existing data
     new_df = pd.DataFrame(new_articles)
+    
     if not existing_df.empty:
+        # Remove any existing articles with same URLs (keep newest)
+        existing_df = existing_df[~existing_df['url'].isin(new_df['url'])]
         df = pd.concat([existing_df, new_df], ignore_index=True)
     else:
         df = new_df
 
-    # Save as Parquet
+    # Save initial version
     storage.store_data(df, filepath, content_type='application/parquet')
-    logger.info(f"Processed and saved email: {email.subject} to {filepath}")
+    logger.info(f"Initial save: {len(new_articles)} articles from email {email.subject}")
+
+    # Sanitize content using OpenAI batch processing
+    sanitizer = ContentSanitizer()
+    raw_contents = [article['raw_content'] for article in new_articles]
+    sanitized_contents = sanitizer.sanitize_contents(raw_contents)
+
+    # Update DataFrame with sanitized contents using URL matching
+    for i, article in enumerate(new_articles):
+        url = article['url']
+        content = sanitized_contents[i]
+        df.loc[df['url'] == url, 'raw_content'] = content
+    
+    # Save updated version
+    storage.store_data(df, filepath, content_type='application/parquet')
+    logger.info(f"Updated {len(sanitized_contents)} articles with sanitized content")
 
 def fetch_articles_from_days(days: int, criteria: Optional[str] = None) -> List[dict]:
     """
