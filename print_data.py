@@ -19,7 +19,8 @@ def print_storage_data(date: str = None, last_days: int = None, show_raw: bool =
         export_path: Local directory path to export files
     """
     storage = StorageUtil()
-    # storage.delete_data(filepath='newsletter-digest/2024-04-10.parquet')
+    # storage.delete_data(filepath='newsletter-digest/2025-04-12.parquet')
+    # storage.delete_data(filepath='newsletter-digest/2025-04-14.parquet')
     # Create export directory if needed
     if export_path:
         export_dir = Path(export_path)

@@ -103,9 +103,6 @@ def process_and_save_email(email):
             'criteria': str(article['criteria']),  # Convert list to string for Parquet
             'created_at': datetime.now(),
             'raw_content': article.get('raw_content', ''),
-            'author': article.get('author', ''),
-            'image_url': article.get('image_url', ''),
-            'publish_date': article.get('publish_date', '')
         }
         new_articles.append(new_article)
 

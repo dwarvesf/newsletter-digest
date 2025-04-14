@@ -77,9 +77,41 @@ def get_seo_description(url: str) -> str:
         logger.error(f"Error fetching SEO description for {url}: {str(e)}")
         return ""
 
+def sanitize_content(content: str) -> str:
+    """
+    Sanitize content using OpenAI to clean and format the text
+    """
+    try:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a content cleaner. Clean and format the following markdown article. "
+                        "Remove any of the following:\n"
+                        "- Irrelevant links (e.g. unrelated URLs, 'read more', 'source' mentions)\n"
+                        "- HTML tags, code artifacts, or leftover formatting symbols\n"
+                        "- Unrelated or broken data from crawling (e.g. timestamps, navigation, cookies notices)\n"
+                        "- Repeated or redundant phrases\n"
+                        "Preserve the original content structure and meaning. Output clean, readable paragraphs in markdown."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": content
+                }
+            ],
+            temperature=0.1,
+        )   
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"Error sanitizing content: {str(e)}")
+        return content
+
 def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
     """
-    Fetch article content using Jina AI REST API and parse the response
+    Fetch article content using Jina AI REST API, parse and sanitize the response
     
     Args:
         url (str): The URL to fetch content from
@@ -87,7 +119,7 @@ def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
         retries (int): Number of retries for failed requests
         
     Returns:
-        str: Article content text after 'Markdown Content:' line
+        str: Sanitized article content
     """
     try:
         jina_url = f"https://r.jina.ai/{url}"
@@ -96,7 +128,6 @@ def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
         }
         
         session = create_session_with_retries(retries=retries)
-        
         response = session.get(
             jina_url, 
             headers=headers, 
@@ -104,6 +135,7 @@ def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
         )
         response.raise_for_status()
 
+        # Extract content after 'Markdown Content:' line
         content_lines = []
         found_markdown = False
         
@@ -114,7 +146,14 @@ def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
             if found_markdown and line.strip():
                 content_lines.append(line.strip())
         
-        return '\n'.join(content_lines) if content_lines else ""
+        raw_content = '\n'.join(content_lines) if content_lines else ""
+        
+        # Only sanitize if we have content
+        if raw_content:
+            logger.info(f"Sanitizing content from {url}")
+            return sanitize_content(raw_content)
+            
+        return ""
             
     except requests.Timeout as e:
         logger.error(f"Timeout fetching content from Jina AI for {url}: {str(e)}")
