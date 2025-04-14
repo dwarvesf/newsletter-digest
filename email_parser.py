@@ -1,7 +1,6 @@
 import logging
 import os
 import json
-import re
 import time
 import requests
 from bs4 import BeautifulSoup
@@ -12,7 +11,6 @@ from email.utils import parsedate_to_datetime
 from promts import get_extract_articles_prompt
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +20,11 @@ model_name = get_openai_model_name()
 
 # Rate limiter variables
 last_api_call_time = 0
-rate_limit_interval = 60 / get_openai_rate_limit()
+rate_limit_interval = 60 / 20  # 20 requests per minute = 3 seconds between requests
+
+# Add rate limiter variables for Jina AI
+jina_last_call_time = 0
+jina_rate_limit_interval = 60 / 20  # 20 requests per minute = 3 seconds between requests
 
 def create_session_with_retries(retries: int = 3, backoff_factor: float = 0.5) -> requests.Session:
     """Create a session with retry strategy"""
@@ -78,9 +80,9 @@ def get_seo_description(url: str) -> str:
         return ""
 
 
-def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
+def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> dict:
     """
-    Fetch article content using Jina AI REST API, parse  the response
+    Fetch article content using Jina AI REST API and parse the JSON response
     
     Args:
         url (str): The URL to fetch content from
@@ -88,12 +90,30 @@ def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
         retries (int): Number of retries for failed requests
         
     Returns:
-        str: Article content
+        dict: Article content object with structure:
+            {
+                'title': str,
+                'description': str,
+                'content': str,
+                'warning': str,
+                'url': str
+            }
     """
+    global jina_last_call_time
+
     try:
+        # Ensure rate limit is respected
+        current_time = time.time()
+        time_since_last_call = current_time - jina_last_call_time
+        if time_since_last_call < jina_rate_limit_interval:
+            sleep_time = jina_rate_limit_interval - time_since_last_call
+            logger.info(f"Jina rate limit: sleeping for {sleep_time:.2f} seconds")
+            time.sleep(sleep_time)
+
         jina_url = f"https://r.jina.ai/{url}"
         headers = {
-            'Authorization': f'Bearer {os.getenv("JINA_API_KEY")}',
+            # 'Authorization': f'Bearer {os.getenv("JINA_API_KEY")}',
+            'Accept': 'application/json'
         }
         
         session = create_session_with_retries(retries=retries)
@@ -102,39 +122,49 @@ def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> str:
             headers=headers, 
             timeout=(timeout, timeout)
         )
+        jina_last_call_time = time.time()  # Update last call time after successful request
         response.raise_for_status()
 
-        # Extract content after 'Markdown Content:' line
-        content_lines = []
-        found_markdown = False
+        # Parse JSON response
+        json_response = response.json()
         
-        for line in response.text.split('\n'):
-            if line.startswith('Markdown Content:'):
-                found_markdown = True
-                continue
-            if found_markdown and line.strip():
-                content_lines.append(line.strip())
-        
-        raw_content = '\n'.join(content_lines) if content_lines else ""
-        
-        if raw_content:
-            logger.info(f"Sanitizing content from {url}")
-            return raw_content
+        # Check for successful response
+        if json_response.get('code') == 200 and json_response.get('data'):
+            data = json_response['data']
             
-        return ""
+            # Log warning if present
+            if data.get('warning'):
+                logger.warning(f"Jina API warning for {url}: {data['warning']}")
+            
+            # Return structured content
+            return {
+                'title': data.get('title', ''),
+                'description': data.get('description', ''),
+                'content': data.get('content', ''),
+                'warning': data.get('warning', ''),
+                'url': url
+            }
+            
+        return {
+            'title': '',
+            'description': '',
+            'content': '',
+            'warning': '',
+            'url': url
+        }
             
     except requests.Timeout as e:
         logger.error(f"Timeout fetching content from Jina AI for {url}: {str(e)}")
-        return ""
+        return {'title': '', 'description': '', 'content': '', 'warning': str(e), 'url': url}
     except requests.ConnectionError as e:
         logger.error(f"Connection error with Jina AI for {url}: {str(e)}")
-        return ""
+        return {'title': '', 'description': '', 'content': '', 'warning': str(e), 'url': url}
     except requests.RequestException as e:
         logger.error(f"Request failed for Jina AI for {url}: {str(e)}")
-        return ""
+        return {'title': '', 'description': '', 'content': '', 'warning': str(e), 'url': url}
     except Exception as e:
         logger.error(f"Unexpected error fetching content from Jina AI for {url}: {str(e)}")
-        return ""
+        return {'title': '', 'description': '', 'content': '', 'warning': str(e), 'url': url}
 
 def get_sender_domain(email_address: str) -> str:
     """Extract domain part from email address"""
@@ -196,9 +226,11 @@ def extract_articles(email):
             if isinstance(article.get('criteria'), list):
                 logger.info(f"Fetching content for {article['url']}")
                 content = get_article_content(article['url'])
+                article['source_domain'] = sender_domain  # Add sender domain
+
                 if content:
-                    article['raw_content'] = content
-                    article['source_domain'] = sender_domain  # Add sender domain
+                    article['raw_content'] = content.get('content', '')
+                    article['url'] = content.get('url', article['url'])
                 
                 # Fallback to SEO description if Jina fails
                 if not article['description']:

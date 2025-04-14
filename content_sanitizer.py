@@ -10,6 +10,9 @@ from config_manager import get_openai_model_name
 
 logger = logging.getLogger(__name__)
 
+check_interval = 60  # seconds
+timeout_duration = 86400  # seconds (24 hours)
+
 class BatchContentSanitizer:
     def __init__(self, api_key: str = None, model: str = None):
         self.client = OpenAI(api_key=api_key or os.getenv('OPENAI_API_KEY'))
@@ -112,10 +115,11 @@ class BatchContentSanitizer:
                 elif status.status == "failed":
                     raise Exception(f"Batch job failed: {getattr(status, 'errors', 'Unknown error')}")
 
-                if time.time() - start_time > 86400:
+                if time.time() - start_time > timeout_duration:
+                    logger.error("Batch job timed out.")
                     raise TimeoutError("Batch job timed out after 24 hours.")
 
-                time.sleep(60)
+                time.sleep(check_interval)
 
             # Retrieve output
             output_file_id = status.output_file_id
