@@ -127,12 +127,39 @@ class BatchContentSanitizer:
                 logger.warning("No output file available.")
                 return contents
 
-            file_content = self.client.files.content(output_file_id)
-            results = []
-            for line in file_content.decode("utf-8").splitlines():
-                result = json.loads(line)
-                results.append(result["choices"][0]["message"]["content"])
-
+            # Get file content using the correct API - synchronous in Python
+            file_response = self.client.files.content(output_file_id)
+            file_contents = file_response.text
+            
+            # Initialize results with original contents as fallback
+            results = contents.copy()
+            
+            # Parse results from JSONL content and maintain order
+            for line in file_contents.splitlines():
+                if line.strip():  # Skip empty lines
+                    result = json.loads(line)
+                    # Check for successful response and extract content
+                    if (result.get("custom_id") and 
+                        result.get("response") and 
+                        result["response"].get("status_code") == 200 and 
+                        result["response"].get("body", {}).get("choices")):
+                        
+                        # Extract index from custom_id (format: content_timestamp_index)
+                        _, _, idx = result["custom_id"].split('_')
+                        idx = int(idx)
+                        
+                        # Extract sanitized content
+                        content = result["response"]["body"]["choices"][0]["message"]["content"]
+                        
+                        # Place content at correct index
+                        if 0 <= idx < len(results):
+                            results[idx] = content
+                        else:
+                            logger.warning(f"Invalid index {idx} from custom_id: {result['custom_id']}")
+                    else:
+                        logger.warning(f"Skipping invalid response: {line}")
+            
+            logger.info(f"Successfully processed {len(results)} content items")
             return results
             
         except Exception as e:
@@ -140,6 +167,5 @@ class BatchContentSanitizer:
             return contents
             
         finally:
-            # Clean up batch file
             if batch_file:
                 self._cleanup_file(batch_file)
