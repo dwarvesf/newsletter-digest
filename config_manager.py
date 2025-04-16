@@ -42,20 +42,13 @@ def get_allowed_senders():
     
     return valid_senders + [f"*@{domain}" for domain in valid_domains]
 
-def get_min_relevancy_score():
-    # Retrieve the minimum relevance score for articles
-    config = load_config()
-    return config['search_settings']['min_relevance_score']
 
 def get_max_results():
     # Retrieve the maximum number of results to display
     config = load_config()
     return config['output_settings']['max_results']
 
-def get_search_criteria():
-    # Retrieve the list of search criteria from the config
-    config = load_config()
-    return config['search_settings']['criteria']
+
 
 def get_cron_frequency():
     # Retrieve the frequency for the cron job in minutes

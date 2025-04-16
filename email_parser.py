@@ -5,7 +5,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
-from config_manager import get_search_criteria, get_min_relevancy_score, get_openai_model_name, get_openai_rate_limit
+from config_manager import  get_openai_model_name
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from promts import get_extract_articles_prompt
@@ -185,8 +185,7 @@ def extract_articles(email):
     sender_domain = get_sender_domain(email.from_)
     logger.info(f"Processing email from domain: {sender_domain}")
     
-    # Get grouped criteria
-    grouped_criteria = get_search_criteria()
+   
     
     # Ensure rate limit is respected
     current_time = time.time()
@@ -196,7 +195,7 @@ def extract_articles(email):
         logger.info(f"Rate limit exceeded, sleeping for {sleep_time:.2f} seconds")
         time.sleep(sleep_time)
     logger.info("Requesting OpenAI to extract articles from email")
-    prompt = get_extract_articles_prompt(email.text or email.html, grouped_criteria, get_min_relevancy_score())
+    prompt = get_extract_articles_prompt(email.text or email.html,)
 
     try:
         response = client.chat.completions.create(
@@ -223,21 +222,20 @@ def extract_articles(email):
         # Filter articles and fetch descriptions if missing
         processed_articles = []
         for article in articles:
-            if isinstance(article.get('criteria'), list):
-                logger.info(f"Fetching content for {article['url']}")
-                content = get_article_content(article['url'])
-                article['source_domain'] = sender_domain  # Add sender domain
+            logger.info(f"Fetching content for {article['url']}")
+            content = get_article_content(article['url'])
+            article['source_domain'] = sender_domain  # Add sender domain
 
-                if content:
-                    article['raw_content'] = content.get('content', '')
-                    article['url'] = content.get('url', article['url'])
-                
-                # Fallback to SEO description if Jina fails
-                if not article['description']:
-                    logger.info(f"Falling back to SEO description for {article['url']}")
-                    article['description'] = get_seo_description(article['url'])
-                
-                processed_articles.append(article)
+            if content:
+                article['raw_content'] = content.get('content', '')
+                article['url'] = content.get('url', article['url'])
+            
+            # Fallback to SEO description if Jina fails
+            if not article['description']:
+                logger.info(f"Falling back to SEO description for {article['url']}")
+                article['description'] = get_seo_description(article['url'])
+            
+            processed_articles.append(article)
         
         articles = processed_articles
 

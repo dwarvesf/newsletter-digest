@@ -40,7 +40,7 @@ def print_storage_data(date: str = None, last_days: int = None, show_raw: bool =
         ]
 
     if not blobs:
-        print("No files found matching criteria")
+        print("No files found matching")
         return
 
     # Print and export each file's content
@@ -65,11 +65,6 @@ def print_storage_data(date: str = None, last_days: int = None, show_raw: bool =
                     print("\nFirst 5 rows:")
                     print(data.head())
                     
-                    if 'criteria' in data.columns:
-                        print("\nUnique criteria:")
-                        criteria = data['criteria'].explode().unique()
-                        print(criteria)
-                
                 # Export DataFrame if path provided
                 if export_path:
                     filename = os.path.basename(blob['name'])

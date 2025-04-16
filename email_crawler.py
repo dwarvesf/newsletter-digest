@@ -5,15 +5,14 @@ processing them, and saving the processed content using Google Cloud Storage.
 
 import os
 from imap_tools import MailBox, AND, OR, MailMessageFlags
-from datetime import datetime, timedelta
+from datetime import datetime
 from config_manager import get_allowed_senders
 import logging
 import socket
 from email_parser import extract_articles, parse_date
 from dotenv import load_dotenv
 from storage import StorageUtil
-import ast
-from typing import List, Optional
+from typing import List
 import pandas as pd
 from content_sanitizer import ContentSanitizer
 
@@ -74,9 +73,9 @@ def fetch_unread_emails():
                     mailbox.flag(email.uid, MailMessageFlags.SEEN, False)
 
         # Sanitize content after closing the mailbox connection
-        if len(articles) > 0:
-            logger.info(f"Sanitizing {len(articles)} articles")
-            sanitize_content(articles)
+        # if len(articles) > 0:
+        #     logger.info(f"Sanitizing {len(articles)} articles")
+        #     sanitize_content(articles)
 
     except socket.error as e:
         logger.error(f"Socket error: {str(e)}")
@@ -123,7 +122,6 @@ def process_and_save_email(email):
             'title': article['title'],
             'description': article['description'],
             'url': url,
-            'criteria': str(article['criteria']),
             'created_at': datetime.now(),
             'source_domain': article.get('source_domain', ''),
             'raw_content': article.get('raw_content', ''),
@@ -174,55 +172,6 @@ def sanitize_content(articles: List[dict]):
     except Exception as e:
         logger.error(f"Failed to update sanitized content: {str(e)}")
 
-def fetch_articles_from_days(days: int, criteria: Optional[str] = None) -> List[dict]:
-    """
-    Fetch articles from the last 'days' days from Parquet files.
-    """
-    cutoff_date = datetime.now() - timedelta(days=days)
-    logger.info(f"Fetching articles since {cutoff_date}")
-
-    storage = StorageUtil()
-    all_articles = []
-
-    # Generate list of dates to check
-    dates_to_check = [
-        (datetime.now() - timedelta(days=x)).strftime('%Y-%m-%d')
-        for x in range(days)
-    ]
-
-    # Fetch and combine articles from each date
-    for date_str in dates_to_check:
-        try:
-            filepath = f'newsletter-digest/{date_str}.parquet'
-            df = pd.DataFrame(storage.read_data(filepath))
-            if not df.empty:
-                # Convert criteria string back to list
-                df['criteria'] = df['criteria'].apply(ast.literal_eval)
-                all_articles.append(df)
-        except Exception as e:
-            logger.debug(f"No articles found for {date_str}: {str(e)}")
-            continue
-
-    if not all_articles:
-        return []
-
-    # Combine all DataFrames
-    combined_df = pd.concat(all_articles, ignore_index=True)
-    
-    # Filter by date
-    mask = combined_df['email_time'] >= cutoff_date
-    filtered_df = combined_df[mask]
-
-    # Filter by criteria if provided
-    if criteria:
-        criteria_list = [c.strip().lower() for c in criteria.split(',')]
-        mask = filtered_df['criteria'].apply(
-            lambda x: any(c['name'].lower() in criteria_list for c in x)
-        )
-        filtered_df = filtered_df[mask]
-
-    # Convert DataFrame back to list of dicts
-    return filtered_df.to_dict('records')
 
 if __name__ == "__main__":
     fetch_unread_emails()

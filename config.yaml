@@ -17,16 +17,6 @@ email_settings:
     - ui.dev
     - thisweekinreact.com
 
-search_settings:
-  min_relevance_score: 0.5
-  criteria:
-    - React
-    - NextJS
-    - AI
-    - Typescript, Javascript
-    - TailwindCSS, CSS
-    - Tools
-
 output_settings:
   max_results: 10
 
