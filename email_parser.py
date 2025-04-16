@@ -112,8 +112,8 @@ def get_article_content(url: str, timeout: int = 20, retries: int = 3) -> dict:
 
         jina_url = f"https://r.jina.ai/{url}"
         headers = {
-            # 'Authorization': f'Bearer {os.getenv("JINA_API_KEY")}',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'X-Base': 'final'  # Added custom header
         }
         
         session = create_session_with_retries(retries=retries)
