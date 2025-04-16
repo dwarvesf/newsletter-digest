@@ -73,9 +73,9 @@ def fetch_unread_emails():
                     mailbox.flag(email.uid, MailMessageFlags.SEEN, False)
 
         # Sanitize content after closing the mailbox connection
-        # if len(articles) > 0:
-        #     logger.info(f"Sanitizing {len(articles)} articles")
-        #     sanitize_content(articles)
+        if len(articles) > 0:
+            logger.info(f"Sanitizing {len(articles)} articles")
+            sanitize_content(articles)
 
     except socket.error as e:
         logger.error(f"Socket error: {str(e)}")
