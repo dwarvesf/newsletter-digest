@@ -10,7 +10,7 @@ from config_manager import get_openai_model_name
 
 logger = logging.getLogger(__name__)
 
-check_interval = 60  # seconds
+check_interval = 600  # seconds
 timeout_duration = 86400  # seconds (24 hours)
 
 class BatchContentSanitizer:
@@ -24,7 +24,8 @@ class BatchContentSanitizer:
             "- HTML tags, code artifacts, or leftover formatting symbols\n"
             "- Unrelated or broken data from crawling\n"
             "- Repeated or redundant phrases\n"
-            "Preserve the original content structure and meaning. Output clean, readable paragraphs."
+            "Preserve the original content structure and meaning. Output clean, readable paragraphs.\n"
+            "If no valid content is found, return an empty string."
         )
         self.batch_dir = Path("batch_files")
         self.batch_dir.mkdir(exist_ok=True)
@@ -144,16 +145,20 @@ class BatchContentSanitizer:
                         result["response"].get("status_code") == 200 and 
                         result["response"].get("body", {}).get("choices")):
                         
-                        # Extract index from custom_id (format: content_timestamp_index)
-                        _, _, idx = result["custom_id"].split('_')
+                        # Extract only the last part of custom_id
+                        idx = result["custom_id"].split('_')[-1]
                         idx = int(idx)
                         
                         # Extract sanitized content
-                        content = result["response"]["body"]["choices"][0]["message"]["content"]
+                        content = result["response"]["body"]["choices"][0]["message"]["content"].strip()
                         
                         # Place content at correct index
                         if 0 <= idx < len(results):
-                            results[idx] = content
+                            if(content):
+                                logger.info(f"Sanitized content for index {idx} from custom_id: {result['custom_id']}")
+                                results[idx] = content
+                            else:
+                                logger.warning(f"Empty content for index {idx} from custom_id: {result['custom_id']}")
                         else:
                             logger.warning(f"Invalid index {idx} from custom_id: {result['custom_id']}")
                     else:

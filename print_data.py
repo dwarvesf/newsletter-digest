@@ -92,7 +92,7 @@ def print_storage_data(date: str = None, last_days: int = None, show_raw: bool =
                     if not filename.endswith('.json'):
                         filename += '.json'
                     export_file = export_dir / filename
-                    with open(export_file, 'w') as f:
+                    with open(export_file, 'w', encoding='utf-8') as f:
                         json.dump(data, f, indent=2)
                     print(f"\nExported to: {export_file}")
                 

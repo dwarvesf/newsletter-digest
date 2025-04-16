@@ -46,28 +46,37 @@ def fetch_unread_emails():
     logger.info("Fetching unread emails")
 
     try:
+        articles= []
         with MailBox(imap_server, port=993).login(email, password) as mailbox:
             sender_filter = OR(*[f'FROM "{sender}"' for sender in allowed_senders])
             unread_filter = 'UNSEEN'
             
             logger.info("Applying filters and fetching emails")
             
-            emails = list(mailbox.fetch(AND(sender_filter, unread_filter),limit=1))
+            emails = list(mailbox.fetch(AND(sender_filter, unread_filter)))
             logger.info(f"Fetched {len(emails)} unread emails")
 
             # Sort emails by date (older to newer)
             emails.sort(key=lambda x: parse_date(x.date_str))
           
-            print(f"Processing {len(emails)} emails")
+            # Collect raw contents for sanitization after processing emails
             for email in emails:
                 try:
-                    process_and_save_email(email)
+                    # Process email and collect raw content
+                    new_articles = process_and_save_email(email)
+                    articles.extend(new_articles)
+
                     # Mark email as read if processing was successful
                     mailbox.flag(email.uid, MailMessageFlags.SEEN, True)
                 except Exception as e:
                     logger.error(f"Failed to process email {email.subject}: {str(e)}")
                     # Ensure the email remains unread for the next fetch
                     mailbox.flag(email.uid, MailMessageFlags.SEEN, False)
+
+        # Sanitize content after closing the mailbox connection
+        if len(articles) > 0:
+            logger.info(f"Sanitizing {len(articles)} articles")
+            sanitize_content(articles)
 
     except socket.error as e:
         logger.error(f"Socket error: {str(e)}")
@@ -83,8 +92,10 @@ def process_and_save_email(email):
     articles = extract_articles(email)
     storage = StorageUtil()
 
-    # Generate filepath with current date
+    # Define the current date internally within the function
     current_date = datetime.now().strftime('%Y-%m-%d')
+
+    # Use current_date for file paths and other operations
     filepath = f'newsletter-digest/{current_date}.parquet'
 
     # Get existing articles for today
@@ -132,21 +143,41 @@ def process_and_save_email(email):
     # Save initial version
     storage.store_data(df, filepath, content_type='application/parquet')
     logger.info(f"Initial save: {len(new_articles)} articles from email {email.subject}")
+    return new_articles
 
-    # Sanitize content using OpenAI batch processing
+def sanitize_content(articles: List[dict]):
+    """
+    Sanitize content using OpenAI batch processing and update storage in batches of 50.
+    """
+    # Define the current date internally within the function
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    raw_contents = [article['raw_content'] for article in articles]
     sanitizer = BatchContentSanitizer()
-    raw_contents = [article['raw_content'] for article in new_articles]
-    sanitized_contents = sanitizer.sanitize_contents(raw_contents)
 
-    # Update DataFrame with sanitized contents using URL matching
-    for i, article in enumerate(new_articles):
-        url = article['url']
-        content = sanitized_contents[i]
-        df.loc[df['url'] == url, 'raw_content'] = content
-    
-    # Save updated version
-    storage.store_data(df, filepath, content_type='application/parquet')
-    logger.info(f"Updated {len(sanitized_contents)} articles with sanitized content")
+    # Process in batches of 50
+    batch_size = 50
+    for i in range(0, len(raw_contents), batch_size):
+        batch = raw_contents[i:i + batch_size]
+        logger.info(f"Sanitizing batch {i // batch_size + 1} with {len(batch)} items")
+
+        sanitized_contents = sanitizer.sanitize_contents(batch)
+
+        # Update DataFrame with sanitized contents using URL matching
+        storage = StorageUtil()
+        filepath = f'newsletter-digest/{current_date}.parquet'
+
+        try:
+            df = pd.DataFrame(storage.read_data(filepath))
+            for i, article in enumerate(batch):
+                url = article['url']
+                content = sanitized_contents[i]
+                df.loc[df['url'] == url, 'raw_content'] = content
+
+            # Save updated version
+            storage.store_data(df, filepath, content_type='application/parquet')
+            logger.info(f"Updated batch {i // batch_size + 1} with sanitized content")
+        except Exception as e:
+            logger.error(f"Failed to update sanitized content for batch {i // batch_size + 1}: {str(e)}")
 
 def fetch_articles_from_days(days: int, criteria: Optional[str] = None) -> List[dict]:
     """
