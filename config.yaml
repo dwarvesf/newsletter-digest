@@ -17,16 +17,6 @@ email_settings:
     - ui.dev
     - thisweekinreact.com
 
-search_settings:
-  min_relevance_score: 0.5
-  criteria:
-    - React
-    - NextJS
-    - AI
-    - Typescript, Javascript
-    - TailwindCSS, CSS
-    - Tools
-
 output_settings:
   max_results: 10
 
@@ -34,5 +24,5 @@ cron_settings:
   frequency: 1440 # Frequency in minutes
 # config.yaml
 api_settings:
-  gemini_rate_limit: 10 # Maximum number of calls per minute
-  gemini_model_name: "gemini-1.5-pro" # Model name
+  openai_rate_limit: 60 # RPM
+  openai_model_name: "gpt-4o-mini" # Model name

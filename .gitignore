@@ -4,3 +4,7 @@ venv
 .env
 newsletter_bot.log
 .DS_Store
+output
+
+# Batch processing files
+batch_files

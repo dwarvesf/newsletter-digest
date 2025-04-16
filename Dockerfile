@@ -1,20 +1,32 @@
-# Use an official Python runtime as a parent image
+# Use Python 3.11 slim image as base
 FROM python:3.11-slim
 
-# Set the working directory in the container
+# Set working directory
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+# Install system dependencies required for some Python packages
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install any needed packages specified in requirements.txt
+# Copy requirements first to leverage Docker cache
+COPY requirements.txt .
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Make port 80 available to the world outside this container
-EXPOSE 80
+# Copy application code
+COPY . .
 
-# Make port 5000 available for the health check
-EXPOSE 5000
+# Set timezone
+RUN ln -fs /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
 
-# Run discord_bot.py when the container launches
-CMD ["python", "discord_bot.py"]
+# Create directories for output and batch files
+RUN mkdir -p output batch_files
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
+# Set the default command
+CMD ["python", "main.py", "--crawl"]
