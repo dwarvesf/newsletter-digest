@@ -20,7 +20,7 @@ def print_storage_data(date: str = None, last_days: int = None, show_raw: bool =
     """
     storage = StorageUtil()
     # storage.delete_data(filepath='newsletter-digest/2025-04-12.parquet')
-    # storage.delete_data(filepath='newsletter-digest/2025-04-14.parquet')
+    # storage.delete_data(filepath='newsletter-digest/2025-04-16.parquet')
     # Create export directory if needed
     if export_path:
         export_dir = Path(export_path)

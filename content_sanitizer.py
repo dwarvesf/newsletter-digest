@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 check_interval = 600  # seconds
 timeout_duration = 86400  # seconds (24 hours)
 
-class BatchContentSanitizer:
+class ContentSanitizer:
     def __init__(self, api_key: str = None, model: str = None):
         self.client = OpenAI(api_key=api_key or os.getenv('OPENAI_API_KEY'))
         self.model = model or get_openai_model_name()

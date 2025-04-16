@@ -15,7 +15,7 @@ from storage import StorageUtil
 import ast
 from typing import List, Optional
 import pandas as pd
-from content_sanitizer import BatchContentSanitizer
+from content_sanitizer import ContentSanitizer
 
 # Set up logging
 logging.basicConfig(
@@ -147,37 +147,32 @@ def process_and_save_email(email):
 
 def sanitize_content(articles: List[dict]):
     """
-    Sanitize content using OpenAI batch processing and update storage in batches of 50.
+    Sanitize content using OpenAI processing and update storage.
     """
     # Define the current date internally within the function
     current_date = datetime.now().strftime('%Y-%m-%d')
     raw_contents = [article['raw_content'] for article in articles]
-    sanitizer = BatchContentSanitizer()
+    sanitizer = ContentSanitizer()
 
-    # Process in batches of 50
-    batch_size = 50
-    for i in range(0, len(raw_contents), batch_size):
-        batch = raw_contents[i:i + batch_size]
-        logger.info(f"Sanitizing batch {i // batch_size + 1} with {len(batch)} items")
+    logger.info(f"Sanitizing {len(raw_contents)} items")
 
-        sanitized_contents = sanitizer.sanitize_contents(batch)
+    sanitized_contents = sanitizer.sanitize_contents(raw_contents)
 
-        # Update DataFrame with sanitized contents using URL matching
-        storage = StorageUtil()
-        filepath = f'newsletter-digest/{current_date}.parquet'
+    # Update DataFrame with sanitized contents using URL matching
+    storage = StorageUtil()
+    filepath = f'newsletter-digest/{current_date}.parquet'
 
-        try:
-            df = pd.DataFrame(storage.read_data(filepath))
-            for i, article in enumerate(batch):
-                url = article['url']
-                content = sanitized_contents[i]
-                df.loc[df['url'] == url, 'raw_content'] = content
+    try:
+        df = pd.DataFrame(storage.read_data(filepath))
+        for i, content in enumerate(sanitized_contents):
+            url = articles[i]['url']  # Use the original articles list to get the URL
+            df.loc[df['url'] == url, 'raw_content'] = content
 
-            # Save updated version
-            storage.store_data(df, filepath, content_type='application/parquet')
-            logger.info(f"Updated batch {i // batch_size + 1} with sanitized content")
-        except Exception as e:
-            logger.error(f"Failed to update sanitized content for batch {i // batch_size + 1}: {str(e)}")
+        # Save updated version
+        storage.store_data(df, filepath, content_type='application/parquet')
+        logger.info("Sanitized content updated successfully.")
+    except Exception as e:
+        logger.error(f"Failed to update sanitized content: {str(e)}")
 
 def fetch_articles_from_days(days: int, criteria: Optional[str] = None) -> List[dict]:
     """

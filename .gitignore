@@ -7,4 +7,4 @@ newsletter_bot.log
 output
 
 # Batch processing files
-batch_input_*.jsonl
+batch_files
